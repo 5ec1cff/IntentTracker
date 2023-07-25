@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">IntentTracker</string>
+    <string name="xposed_description">Intent tracker</string>
+</resources>
