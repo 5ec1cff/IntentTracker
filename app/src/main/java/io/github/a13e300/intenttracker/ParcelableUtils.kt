@@ -87,14 +87,16 @@ fun Bundle.convertToBundleInfo(): Bundle = Bundle().let { result ->
                 result.putParcelable(k, v.convertToBundleInfoOrSelf())
             }
             is Serializable -> {
-                if (v.javaClass.classLoader == ClassLoader.getSystemClassLoader()) {
+                if (v.javaClass.classLoader == bootClassLoader) {
                     result.putSerializable(k, v)
                 } else {
-                    result.putParcelable(k, BundleValueInfo(
-                        v.toString(),
-                        v.javaClass.name,
-                        v.javaClass.classLoader?.toString() ?: "null"
-                    ))
+                    result.putParcelable(
+                        k, BundleValueInfo(
+                            v.toString(),
+                            v.javaClass.name,
+                            v.javaClass.classLoader?.toString() ?: "null"
+                        )
+                    )
                 }
             }
         }
