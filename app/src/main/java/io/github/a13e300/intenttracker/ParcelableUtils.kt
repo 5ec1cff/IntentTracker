@@ -10,8 +10,10 @@ import io.github.a13e300.intenttracker.service.BundleValueInfo
 import io.github.a13e300.intenttracker.service.IntentTrackerService
 import java.io.Serializable
 
+private val bootClassLoader = Bundle::class.java.classLoader
+
 fun Parcelable.convertToBundleInfoOrSelf(): Parcelable =
-    if (javaClass.classLoader == ClassLoader.getSystemClassLoader()) {
+    if (javaClass.classLoader == bootClassLoader) {
         this
     } else {
         BundleValueInfo(
