@@ -13,9 +13,13 @@ import io.github.a13e300.intenttracker.service.IIntentTrackerService
 import io.github.a13e300.intenttracker.service.IServiceFetcher
 import io.github.a13e300.intenttracker.service.IntentTrackerService
 import io.github.a13e300.intenttracker.service.StartActivityInfo
+import org.apache.commons.cli.DefaultParser
+import org.apache.commons.cli.HelpFormatter
+import org.apache.commons.cli.Option
+import org.apache.commons.cli.Options
 import java.util.Scanner
 
-class ServiceFetcher : IServiceFetcher.Stub() {
+class ServiceFetcher(private val flags: Int) : IServiceFetcher.Stub() {
     private val mServices = mutableSetOf<IBinder>()
     override fun publishService(binder: IBinder) {
         kotlin.runCatching {
@@ -51,7 +55,7 @@ class ServiceFetcher : IServiceFetcher.Stub() {
                             println()
                         }
                     },
-                    IntentTrackerService.FLAG_LISTEN_START_ACTIVITY or IntentTrackerService.FLAG_GET_STACK_TRACE or IntentTrackerService.FLAG_LISTEN_ACTIVITY_STARTED
+                    flags
                 )
                 binder.linkToDeath(
                     {
@@ -70,9 +74,8 @@ class ServiceFetcher : IServiceFetcher.Stub() {
 }
 
 val am: IActivityManager = IActivityManager.Stub.asInterface(ServiceManager.getService("activity"))
-val fetcher = ServiceFetcher()
 
-fun discoveryServices() {
+fun discoveryServices(fetcher: IServiceFetcher) {
     am.broadcastIntentCompat(Intent(
         IntentTrackerService.ACTION_REQUIRE_SERVICE
     ).apply {
@@ -81,12 +84,44 @@ fun discoveryServices() {
 }
 
 fun main(args: Array<String>) {
-    discoveryServices()
+    val options = Options()
+    options.addOption(
+        Option.builder("sa").longOpt("start-activity").desc("monitor startActivity").hasArg(false)
+            .build()
+    )
+    options.addOption(
+        Option.builder("as").longOpt("activity-start").desc("monitor activities started")
+            .hasArg(false).build()
+    )
+    options.addOption(
+        Option.builder("st").longOpt("stack-trace").desc("get stack traces").hasArg(false).build()
+    )
+    val parser = DefaultParser()
+    val cmd = parser.parse(options, args)
+    val helpFormatter = HelpFormatter()
+    var flags = 0
+    if (cmd.hasOption("start-activity")) {
+        flags = flags or IntentTrackerService.FLAG_LISTEN_START_ACTIVITY
+    }
+    if (cmd.hasOption("activity-start")) {
+        flags = flags or IntentTrackerService.FLAG_LISTEN_ACTIVITY_STARTED
+    }
+    if (flags == 0) {
+        println("Neither start-activity nor activity-start is specified!")
+        helpFormatter.printHelp("itc", options)
+        return
+    }
+    if (cmd.hasOption("stack-trace")) {
+        flags = flags or IntentTrackerService.FLAG_GET_STACK_TRACE
+    }
+    val fetcher = ServiceFetcher(flags)
+    println("r -> re-discovery, q -> exit")
+    discoveryServices(fetcher)
     val scanner = Scanner(System.`in`)
     while (scanner.hasNextLine()) {
         val l = scanner.nextLine()
         when (l) {
-            "r" -> discoveryServices()
+            "r" -> discoveryServices(fetcher)
             "q" -> break
         }
     }
