@@ -1,8 +1,6 @@
 package io.github.a13e300.intenttracker.cli
 
-import android.app.ActivityThread
 import android.app.IActivityManager
-import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import android.os.Looper
@@ -10,13 +8,12 @@ import android.os.ServiceManager
 import androidx.core.os.bundleOf
 import io.github.a13e300.intenttracker.broadcastIntentCompat
 import io.github.a13e300.intenttracker.print
+import io.github.a13e300.intenttracker.service.ActivityStartedInfo
 import io.github.a13e300.intenttracker.service.IIntentTrackerListener
 import io.github.a13e300.intenttracker.service.IIntentTrackerService
 import io.github.a13e300.intenttracker.service.IServiceFetcher
 import io.github.a13e300.intenttracker.service.IntentTrackerService
 import io.github.a13e300.intenttracker.service.StartActivityInfo
-import java.io.File
-import java.io.PrintStream
 
 class ServiceFetcher : IServiceFetcher.Stub() {
     override fun publishService(binder: IBinder) {
@@ -26,17 +23,31 @@ class ServiceFetcher : IServiceFetcher.Stub() {
                 println("remote version not match")
             } else {
                 println("service registered: ${service.serviceInfo}")
-                service.registerListener(object : IIntentTrackerListener.Stub() {
-                    override fun onStartActivity(info: StartActivityInfo) {
-                        println("start activity from ${service.serviceInfo}")
-                        info.intent.print()
-                        println("stack trace:")
-                        info.stackTraceElements.forEach {
-                            println("  ${it.className}.${it.methodName}(${it.fileName}:${it.lineNumber})")
+                service.registerListener(
+                    object : IIntentTrackerListener.Stub() {
+                        override fun onStartActivity(info: StartActivityInfo) {
+                            println("start activity from ${service.serviceInfo}")
+                            info.intent.print()
+                            println("stack trace:")
+                            info.stackTraceElements.forEach {
+                                println("  ${it.className}.${it.methodName}(${it.fileName}:${it.lineNumber})")
+                            }
+                            println()
                         }
-                        println()
-                    }
-                }, IntentTrackerService.FLAG_LISTEN_START_ACTIVITY or IntentTrackerService.FLAG_GET_STACK_TRACE)
+
+                        override fun onActivityStarted(info: ActivityStartedInfo) {
+                            println("activity ${info.component} started in ${service.serviceInfo} referrer=${info.referrer}")
+                            info.intent.print()
+                            println("stack trace:")
+                            info.stackTraceElements.forEach {
+                                println("  ${it.className}.${it.methodName}(${it.fileName}:${it.lineNumber})")
+                            }
+                            println()
+                        }
+                    },
+                    IntentTrackerService.FLAG_LISTEN_START_ACTIVITY or IntentTrackerService.FLAG_GET_STACK_TRACE or IntentTrackerService.FLAG_LISTEN_ACTIVITY_STARTED
+                )
+                binder.linkToDeath({ println("${service.serviceInfo} died") }, 0)
             }
         }.onFailure {
             println("failed to get service")

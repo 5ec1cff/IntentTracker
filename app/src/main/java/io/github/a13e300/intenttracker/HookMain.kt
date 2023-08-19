@@ -2,18 +2,22 @@ package io.github.a13e300.intenttracker
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.ActivityThread
 import android.app.AndroidAppHelper
 import android.app.Instrumentation
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ActivityInfo
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook
+import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import io.github.a13e300.intenttracker.service.IServiceFetcher
@@ -46,13 +50,32 @@ class HookMain : IXposedHookLoadPackage {
                 }
             }
         )
+        XposedBridge.hookAllMethods(
+            ActivityThread::class.java, "performLaunchActivity",
+            object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    val acr = param.args[0] // ActivityClientRecord
+                    val intent = XposedHelpers.getObjectField(acr, "intent") as? Intent ?: return
+                    val activityInfo =
+                        XposedHelpers.getObjectField(acr, "activityInfo") as? ActivityInfo ?: return
+                    val component = ComponentName(activityInfo.packageName, activityInfo.name)
+                    val referrer =
+                        XposedHelpers.getObjectField(acr, "referrer") as? String ?: "null"
+                    service.dispatchActivityStarted(
+                        intent, component, referrer
+                    )
+                }
+            }
+        )
         handler.post {
             AndroidAppHelper.currentApplication().registerReceiver(
                 object : BroadcastReceiver() {
                     override fun onReceive(context: Context, intent: Intent) {
                         logD("intent=$intent")
                         if (intent.action == IntentTrackerService.ACTION_REQUIRE_SERVICE) {
-                            val binder = intent.extras?.getBinder(IntentTrackerService.KEY_SERVICE_FETCHER) ?: return
+                            val binder =
+                                intent.extras?.getBinder(IntentTrackerService.KEY_SERVICE_FETCHER)
+                                    ?: return
                             kotlin.runCatching {
                                 IServiceFetcher.Stub.asInterface(binder)
                                     .publishService(service.asBinder())
