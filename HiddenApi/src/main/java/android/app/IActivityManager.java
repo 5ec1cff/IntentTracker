@@ -38,6 +38,8 @@ public interface IActivityManager extends IInterface {
                         String resultData, Bundle map, String[] requiredPermissions,
                         int appOp, Bundle options, boolean serialized, boolean sticky, int userId) throws RemoteException;
 
+    void setActivityController(IActivityController watcher, boolean imAMonkey);
+
     abstract class Stub extends Binder implements IActivityManager {
 
         public static IActivityManager asInterface(IBinder obj) {

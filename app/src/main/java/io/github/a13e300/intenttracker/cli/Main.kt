@@ -1,5 +1,6 @@
 package io.github.a13e300.intenttracker.cli
 
+import android.app.IActivityController
 import android.app.IActivityManager
 import android.content.Intent
 import android.os.IBinder
@@ -73,6 +74,31 @@ class ServiceFetcher(private val flags: Int) : IServiceFetcher.Stub() {
     }
 }
 
+class MyActivityController : IActivityController.Stub() {
+    override fun activityStarting(intent: Intent?, pkg: String?): Boolean {
+        println("ActivityController: starting activity in $pkg, intent=$intent")
+        return true
+    }
+
+    override fun activityResuming(pkg: String?): Boolean = true
+
+    override fun appCrashed(
+        processName: String?,
+        pid: Int,
+        shortMsg: String?,
+        longMsg: String?,
+        timeMillis: Long,
+        stackTrace: String?
+    ): Boolean = true
+
+    override fun appEarlyNotResponding(processName: String?, pid: Int, annotation: String?): Int = 0
+
+    override fun appNotResponding(processName: String?, pid: Int, processStats: String?): Int = 0
+
+    override fun systemNotResponding(msg: String?): Int = 0
+
+}
+
 val am: IActivityManager = IActivityManager.Stub.asInterface(ServiceManager.getService("activity"))
 
 fun discoveryServices(fetcher: IServiceFetcher) {
@@ -96,29 +122,39 @@ fun main(args: Array<String>) {
     options.addOption(
         Option.builder("st").longOpt("stack-trace").desc("get stack traces").hasArg(false).build()
     )
+    options.addOption(
+        Option.builder("ac").longOpt("activity-controller")
+            .desc("use IActivityController to monitor (no xposed required)").hasArg(false)
+            .build()
+    )
     val parser = DefaultParser()
     val cmd = parser.parse(options, args)
     val helpFormatter = HelpFormatter()
     var flags = 0
+    val requiredOptions = arrayListOf("start-activity", "activity-start", "activity-controller")
+    if (requiredOptions.all { !cmd.hasOption(it) }) {
+        println("Required at least 1 of these options: ${requiredOptions.joinToString(",")}")
+        helpFormatter.printHelp("itc", options)
+        return
+    }
     if (cmd.hasOption("start-activity")) {
         flags = flags or IntentTrackerService.FLAG_LISTEN_START_ACTIVITY
     }
     if (cmd.hasOption("activity-start")) {
         flags = flags or IntentTrackerService.FLAG_LISTEN_ACTIVITY_STARTED
     }
-    if (flags == 0) {
-        println("Neither start-activity nor activity-start is specified!")
-        helpFormatter.printHelp("itc", options)
-        return
-    }
     if (cmd.hasOption("stack-trace")) {
         flags = flags or IntentTrackerService.FLAG_GET_STACK_TRACE
     }
+    if (cmd.hasOption("activity-controller")) {
+        am.setActivityController(MyActivityController(), false)
+    }
     val fetcher = ServiceFetcher(flags)
-    println("r -> re-discovery, q -> exit")
-    discoveryServices(fetcher)
+    if (flags and (IntentTrackerService.FLAG_LISTEN_ACTIVITY_STARTED or IntentTrackerService.FLAG_LISTEN_START_ACTIVITY) != 0)
+        discoveryServices(fetcher)
     val scanner = Scanner(System.`in`)
     while (scanner.hasNextLine()) {
+        println("r -> re-discovery, q -> exit")
         val l = scanner.nextLine()
         when (l) {
             "r" -> discoveryServices(fetcher)
