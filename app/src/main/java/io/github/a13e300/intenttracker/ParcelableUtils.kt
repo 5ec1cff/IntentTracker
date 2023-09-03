@@ -152,7 +152,7 @@ fun Intent.print(level: Int = 0) {
     extras?.print(level + 2)
 }
 
-val Any?.typeName
+val Any?.typeName: String
     get() = when (this) {
         null -> ""
         is BundleValueInfo -> className
@@ -165,8 +165,9 @@ fun Bundle.print(level: Int = 0) {
     println("${prefix}bundle:")
     keySet().forEach { k ->
         val v = get(k)
-        print("${prefix}$k -> (${v.typeName})")
+        print("${prefix}$k -> ")
         when (v) {
+            null -> println("null")
             is Bundle -> {
                 println()
                 v.print(level + 1)
@@ -176,7 +177,11 @@ fun Bundle.print(level: Int = 0) {
                 println()
                 v.print(level + 1)
             }
-            else -> println(v)
+
+            else -> {
+                print("(${v.typeName}) ")
+                println(v)
+            }
         }
     }
 }
