@@ -9,6 +9,7 @@ import android.util.SparseArray
 import io.github.a13e300.intenttracker.service.BundleValueInfo
 import io.github.a13e300.intenttracker.service.IntentTrackerService
 import java.io.Serializable
+import java.lang.reflect.Modifier
 
 private val bootClassLoader = Bundle::class.java.classLoader
 
@@ -105,13 +106,48 @@ fun Bundle.convertToBundleInfo(): Bundle = Bundle().let { result ->
 }
 
 fun Intent.convert(): Intent =
-    cloneFilter().also { r -> extras?.convertToBundleInfo()?.also { r.putExtras(it) } }
+    cloneFilter().also { r ->
+        extras?.convertToBundleInfo()?.also { r.putExtras(it) }
+        r.flags = flags
+    }
+
+val activityFlagsMap = Intent::class.java.declaredFields.mapNotNull {
+    it.isAccessible = true
+    if (!Modifier.isStatic(it.modifiers)) null
+    else if (it.name.startsWith("FLAG_ACTIVITY_")) (it.get(null) as? Int)?.let { v ->
+        v to it.name.removePrefix(
+            "FLAG_ACTIVITY_"
+        ).lowercase()
+    }
+    else null
+}
+
+fun parseActivityFlags(flags: Int) =
+    activityFlagsMap.mapNotNull { (k, v) ->
+        if (flags and k == k) v
+        else null
+    }.joinToString(",")
 
 fun Intent.print(level: Int = 0) {
     val prefix = " ".repeat(level)
-    println("${prefix}intent:$this")
-    extras?.print(level + 1)
+    println("${prefix}intent:")
+    println("$prefix action=${action}")
+    println("$prefix categories=${categories?.joinToString(",")}")
+    println("$prefix flags=$flags ${parseActivityFlags(flags)}")
+    println("$prefix data=$data")
+    println("$prefix type=$type")
+    println("$prefix package=$`package`")
+    println("$prefix component=$component")
+    println("$prefix extras:")
+    extras?.print(level + 2)
 }
+
+val Any?.typeName
+    get() = when (this) {
+        null -> ""
+        is BundleValueInfo -> className
+        else -> javaClass.simpleName
+    }
 
 fun Bundle.print(level: Int = 0) {
     classLoader = IntentTrackerService::class.java.classLoader
@@ -119,10 +155,17 @@ fun Bundle.print(level: Int = 0) {
     println("${prefix}bundle:")
     keySet().forEach { k ->
         val v = get(k)
-        print("${prefix}$k -> ")
+        print("${prefix}$k -> (${v.typeName})")
         when (v) {
-            is Bundle -> v.print(level + 1)
-            is Intent -> v.print(level + 1)
+            is Bundle -> {
+                println()
+                v.print(level + 1)
+            }
+
+            is Intent -> {
+                println()
+                v.print(level + 1)
+            }
             else -> println(v)
         }
     }
