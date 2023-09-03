@@ -28,6 +28,7 @@ fun Bundle.convertToBundleInfo(): Bundle = Bundle().let { result ->
     for (k in keySet()) {
         val v = get(k)
         when (v) {
+            null -> result.putParcelable(k, null)
             is Int -> result.putInt(k, v)
             is Long -> result.putLong(k, v)
             is Boolean -> result.putBoolean(k, v)
@@ -100,6 +101,15 @@ fun Bundle.convertToBundleInfo(): Bundle = Bundle().let { result ->
                     )
                 }
             }
+
+            else -> putParcelable(
+                k,
+                BundleValueInfo(
+                    v.toString(),
+                    v.javaClass.name,
+                    v.javaClass.classLoader?.toString() ?: "null"
+                )
+            )
         }
     }
     result
