@@ -68,7 +68,7 @@ class HookMain : IXposedHookLoadPackage {
             }
         )
         handler.post {
-            AndroidAppHelper.currentApplication().registerReceiver(
+            AndroidAppHelper.currentApplication().registerReceiverCompat(
                 object : BroadcastReceiver() {
                     override fun onReceive(context: Context, intent: Intent) {
                         logD("intent=$intent")
@@ -88,7 +88,7 @@ class HookMain : IXposedHookLoadPackage {
                 },
                 IntentFilter(IntentTrackerService.ACTION_REQUIRE_SERVICE),
                 "android.permission.INTERACT_ACROSS_USERS",
-                null
+                0
             )
         }
         initialized = true

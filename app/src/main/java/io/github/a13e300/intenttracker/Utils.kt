@@ -2,9 +2,11 @@ package io.github.a13e300.intenttracker
 
 import android.app.ActivityThread
 import android.app.IActivityManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.IIntentReceiver
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
 import android.os.Looper
@@ -80,3 +82,14 @@ fun IActivityManager.broadcastIntentCompat(
         )
     }
 }
+
+fun Context.registerReceiverCompat(
+    receiver: BroadcastReceiver,
+    filter: IntentFilter,
+    permissions: String,
+    flags: Int
+) =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+        registerReceiver(receiver, filter, permissions, null, flags.or(Context.RECEIVER_EXPORTED))
+    else
+        registerReceiver(receiver, filter, permissions, null, flags)
