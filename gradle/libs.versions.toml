@@ -1,5 +1,6 @@
 [versions]
 annotation = "1.6.0"
+hiddenapirefine = "4.4.0"
 com-android-application = "8.1.1"
 commons-cli = "1.5.0"
 org-jetbrains-kotlin-android = "1.9.0"
@@ -13,6 +14,8 @@ com-android-library = "8.1.1"
 
 [libraries]
 androidx-annotation = { module = "androidx.annotation:annotation", version.ref = "annotation" }
+hiddenapirefine-annotation = { module = "dev.rikka.tools.refine:annotation", version.ref = "hiddenapirefine" }
+hiddenapirefine-annotationprocessor = { module = "dev.rikka.tools.refine:annotation-processor", version.ref = "hiddenapirefine" }
 commons-cli = { module = "commons-cli:commons-cli", version.ref = "commons-cli" }
 core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "core-ktx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -26,6 +29,7 @@ xposed = { module = "de.robv.android.xposed:api", version = "82" }
 com-android-application = { id = "com.android.application", version.ref = "com-android-application" }
 org-jetbrains-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "org-jetbrains-kotlin-android" }
 com-android-library = { id = "com.android.library", version.ref = "com-android-library" }
+hiddenapirefine-plugin = { id = "dev.rikka.tools.refine", version.ref = "hiddenapirefine" }
 
 [bundles]
 

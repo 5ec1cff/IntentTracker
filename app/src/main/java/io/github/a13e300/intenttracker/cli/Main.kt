@@ -1,12 +1,19 @@
 package io.github.a13e300.intenttracker.cli
 
+import android.app.ActivityManagerHidden
 import android.app.IActivityController
 import android.app.IActivityManager
+import android.app.IActivityTaskManager
+import android.app.IAssistDataReceiver
+import android.app.assist.AssistContent
 import android.content.Intent
+import android.graphics.Bitmap
+import android.os.Bundle
 import android.os.IBinder
 import android.os.ServiceManager
 import androidx.core.os.bundleOf
 import io.github.a13e300.intenttracker.broadcastIntentCompat
+import io.github.a13e300.intenttracker.getParcelableCompat
 import io.github.a13e300.intenttracker.print
 import io.github.a13e300.intenttracker.service.ActivityStartedInfo
 import io.github.a13e300.intenttracker.service.IIntentTrackerListener
@@ -109,32 +116,94 @@ fun discoveryServices(fetcher: IServiceFetcher) {
     })
 }
 
+// https://cs.android.com/android/platform/superproject/main/+/main:frameworks/base/services/core/java/com/android/server/wm/ActivityTaskManagerInternal.java;l=115;drc=2fe80cbc458c12a418e438f9c7dc576942abb561
+const val ASSIST_KEY_STRUCTURE = "structure"
+const val ASSIST_TASK_ID = "taskId"
+const val ASSIST_KEY_CONTENT = "content"
+
+fun printAssistContentExtras(bundle: Bundle?) {
+    if (bundle == null) {
+        println("got null assist content extras, maybe timeout?")
+        return
+    }
+    // https://cs.android.com/android/platform/superproject/main/+/main:frameworks/base/services/core/java/com/android/server/wm/ActivityTaskManagerService.java;l=2776;drc=8bc4eeaea4a778d80c44054d3cf3c9d6d2bbe28e
+    // val struct = bundle.getParcelableCompat(ASSIST_KEY_STRUCTURE, AssistStructure::class.java)
+    var printSomething = false
+    println("keys in bundle: ${bundle.keySet().joinToString(",")}")
+    bundle.getParcelableCompat(ASSIST_KEY_CONTENT, AssistContent::class.java)?.let {
+        it.intent.print()
+        printSomething = true
+    }
+    if (!printSomething) {
+        println("nothing received")
+    }
+}
+
 fun main(args: Array<String>) {
-    val options = Options()
-    options.addOption(
-        Option.builder("sa").longOpt("start-activity").desc("monitor startActivity").hasArg(false)
-            .build()
-    )
-    options.addOption(
-        Option.builder("as").longOpt("activity-start").desc("monitor activities started")
-            .hasArg(false).build()
-    )
-    options.addOption(
-        Option.builder("st").longOpt("stack-trace").desc("get stack traces").hasArg(false).build()
-    )
-    options.addOption(
-        Option.builder("ac").longOpt("activity-controller")
-            .desc("use IActivityController to monitor (no xposed required)").hasArg(false)
-            .build()
-    )
+    val options = Options().apply {
+        addOption(
+            Option.builder("sa").longOpt("start-activity").desc("monitor startActivity")
+                .hasArg(false)
+                .build()
+        )
+        addOption(
+            Option.builder("as").longOpt("activity-start").desc("monitor activities started")
+                .hasArg(false).build()
+        )
+        addOption(
+            Option.builder("st").longOpt("stack-trace").desc("get stack traces").hasArg(false)
+                .build()
+        )
+        addOption(
+            Option.builder("ac").longOpt("activity-controller")
+                .desc("use IActivityController to monitor (no xposed required)").hasArg(false)
+                .build()
+        )
+        addOption(
+            Option.builder("ace").longOpt("assist-context-extras")
+                .desc("")
+                .hasArg(false)
+                .build()
+        )
+    }
     val parser = DefaultParser()
     val cmd = parser.parse(options, args)
     val helpFormatter = HelpFormatter()
     var flags = 0
-    val requiredOptions = arrayListOf("start-activity", "activity-start", "activity-controller")
+    val requiredOptions =
+        arrayListOf("start-activity", "activity-start", "activity-controller", "ace")
     if (requiredOptions.all { !cmd.hasOption(it) }) {
         println("Required at least 1 of these options: ${requiredOptions.joinToString(",")}")
         helpFormatter.printHelp("itc", options)
+        return
+    }
+    if (cmd.hasOption("ace")) {
+        val atm = IActivityTaskManager.Stub.asInterface(ServiceManager.getService("activity_task"))
+        println("fetching assist struct ...")
+        val lock = Object()
+        var received = false
+        atm.requestAssistContextExtras(
+            ActivityManagerHidden.ASSIST_CONTEXT_FULL, object : IAssistDataReceiver.Stub() {
+                override fun onHandleAssistData(resultData: Bundle?) {
+                    synchronized(lock) {
+                        printAssistContentExtras(resultData)
+                        received = true
+                        lock.notifyAll()
+                    }
+                }
+
+                override fun onHandleAssistScreenshot(screenshot: Bitmap?) {
+
+                }
+
+            }, null, null, true, true
+        )
+        // printAssistContentExtras(atm.getAssistContextExtras(ActivityManagerHidden.ASSIST_CONTEXT_FULL))
+        synchronized(lock) {
+            while (!received) {
+                lock.wait()
+            }
+        }
         return
     }
     if (cmd.hasOption("start-activity")) {

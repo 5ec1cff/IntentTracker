@@ -29,4 +29,6 @@ android {
 
 dependencies {
     implementation(libs.androidx.annotation)
+    annotationProcessor(libs.hiddenapirefine.annotationprocessor)
+    compileOnly(libs.hiddenapirefine.annotation)
 }

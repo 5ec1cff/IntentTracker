@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.com.android.application)
     alias(libs.plugins.org.jetbrains.kotlin.android)
     id("org.jetbrains.kotlin.plugin.parcelize")
+    alias(libs.plugins.hiddenapirefine.plugin)
 }
 
 android {

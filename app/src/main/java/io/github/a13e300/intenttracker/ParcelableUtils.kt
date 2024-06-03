@@ -1,6 +1,7 @@
 package io.github.a13e300.intenttracker
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.os.Parcelable
 import android.util.Size
@@ -164,24 +165,37 @@ fun Bundle.print(level: Int = 0) {
     val prefix = " ".repeat(level)
     println("${prefix}bundle:")
     keySet().forEach { k ->
-        val v = get(k)
-        print("${prefix}$k -> ")
-        when (v) {
-            null -> println("null")
-            is Bundle -> {
-                println()
-                v.print(level + 1)
-            }
+        runCatching { get(k) }
+            .onSuccess { v ->
+                print("${prefix}$k -> ")
+                when (v) {
+                    null -> println("null")
+                    is Bundle -> {
+                        println()
+                        v.print(level + 1)
+                    }
 
-            is Intent -> {
-                println()
-                v.print(level + 1)
-            }
+                    is Intent -> {
+                        println()
+                        v.print(level + 1)
+                    }
 
-            else -> {
-                print("(${v.typeName}) ")
-                println(v)
+                    else -> {
+                        print("(${v.typeName}) ")
+                        println(v)
+                    }
+                }
             }
-        }
+            .onFailure { err ->
+                println("${prefix}$k: failed to get (${err})")
+            }
+    }
+}
+
+fun <T : Parcelable> Bundle.getParcelableCompat(key: String, clazz: Class<T>): T? {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        getParcelable(key, clazz)
+    } else {
+        getParcelable(key)
     }
 }
